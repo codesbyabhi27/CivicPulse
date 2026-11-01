@@ -1,0 +1,569 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CivicPulse | Admin Dashboard</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #0b1120;
+            color: #e2e8f0;
+            font-family: Arial, sans-serif;
+        }
+
+        .navbar {
+            background: #111c30;
+            border-bottom: 1px solid #26344b;
+        }
+
+        .navbar-brand {
+            color: #38d9c2 !important;
+            font-size: 23px;
+            letter-spacing: 0.5px;
+        }
+
+        .main-container {
+            max-width: 1450px;
+        }
+
+        .page-heading {
+            color: #f8fafc;
+            font-weight: 700;
+        }
+
+        .muted-text {
+            color: #94a3b8;
+        }
+
+        .dashboard-card {
+            background: #142137;
+            border: 1px solid #263750;
+            padding: 24px;
+            border-radius: 16px;
+            height: 100%;
+            box-shadow: 0 8px 25px #00000020;
+        }
+
+        .dashboard-card h4 {
+            color: #f8fafc;
+            font-weight: 600;
+        }
+
+        .stat-card {
+            position: relative;
+            overflow: hidden;
+            transition: 0.3s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            border-color: #38d9c2;
+        }
+
+        .stat-label {
+            color: #94a3b8;
+            font-size: 14px;
+            margin-bottom: 12px;
+        }
+
+        .stat-number {
+            color: #f8fafc;
+            font-size: 34px;
+            font-weight: 700;
+            margin: 0;
+        }
+
+        .stat-icon {
+            font-size: 28px;
+            margin-bottom: 12px;
+        }
+
+        .accent-total { color: #38d9c2; }
+        .accent-pending { color: #fbbf24; }
+        .accent-progress { color: #60a5fa; }
+        .accent-resolved { color: #4ade80; }
+
+        .chart-container {
+            position: relative;
+            height: 280px;
+        }
+
+        #adminMap {
+            height: 420px;
+            width: 100%;
+            border-radius: 12px;
+            z-index: 1;
+            border: 1px solid #334155;
+        }
+
+        .table {
+            color: #e2e8f0;
+            margin-bottom: 0;
+        }
+
+        .table thead th {
+            background: #1e2e47;
+            color: #38d9c2;
+            border-color: #334155;
+            padding: 15px;
+            white-space: nowrap;
+        }
+
+        .table tbody td {
+            background: #142137;
+            color: #e2e8f0;
+            border-color: #263750;
+            padding: 15px;
+            vertical-align: middle;
+        }
+
+        .table tbody tr:hover td {
+            background: #1c2d46;
+        }
+
+        .form-select {
+            background-color: #0f1b2e;
+            color: #e2e8f0;
+            border-color: #3b4b63;
+        }
+
+        .form-select:focus {
+            background-color: #0f1b2e;
+            color: white;
+            border-color: #38d9c2;
+            box-shadow: 0 0 0 0.2rem #38d9c230;
+        }
+
+        .form-select option {
+            background: #142137;
+            color: white;
+        }
+
+        .btn-teal {
+            background: #14b8a6;
+            color: #071522;
+            border: none;
+            font-weight: 600;
+        }
+
+        .btn-teal:hover {
+            background: #2dd4bf;
+            color: #071522;
+        }
+
+        .section-title {
+            font-weight: 700;
+            color: #f8fafc;
+        }
+
+        .leaflet-popup-content-wrapper,
+        .leaflet-popup-tip {
+            background: #142137;
+            color: #e2e8f0;
+        }
+
+        .leaflet-popup-content {
+            line-height: 1.6;
+        }
+
+        @media (max-width: 768px) {
+            .dashboard-card {
+                padding: 18px;
+            }
+
+            .stat-number {
+                font-size: 28px;
+            }
+
+            #adminMap {
+                height: 330px;
+            }
+
+            .chart-container {
+                height: 250px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<nav class="navbar navbar-dark px-3 px-md-4 py-3">
+    <div class="container-fluid">
+        <a class="navbar-brand fw-bold" href="/">CivicPulse.</a>
+
+        <div class="d-flex gap-2">
+            <a href="/" class="btn btn-outline-light btn-sm">Home</a>
+            <a href="/logout" class="btn btn-danger btn-sm">Logout</a>
+        </div>
+    </div>
+</nav>
+
+<div class="container-fluid main-container py-5 px-3 px-md-4">
+
+    <div class="mb-4">
+        <h1 class="page-heading">Admin Dashboard</h1>
+        <p class="muted-text">
+            Monitor civic complaints, track progress and manage public issues.
+        </p>
+    </div>
+
+    <!-- Statistics -->
+
+    <div class="row g-4 mb-4">
+
+        <div class="col-6 col-lg-3">
+            <div class="dashboard-card stat-card">
+                <div class="stat-icon accent-total">📊</div>
+                <p class="stat-label">Total Complaints</p>
+                <h2 class="stat-number">{{ total }}</h2>
+            </div>
+        </div>
+
+        <div class="col-6 col-lg-3">
+            <div class="dashboard-card stat-card">
+                <div class="stat-icon accent-pending">⏳</div>
+                <p class="stat-label">Pending</p>
+                <h2 class="stat-number">{{ pending }}</h2>
+            </div>
+        </div>
+
+        <div class="col-6 col-lg-3">
+            <div class="dashboard-card stat-card">
+                <div class="stat-icon accent-progress">⚙️</div>
+                <p class="stat-label">In Progress</p>
+                <h2 class="stat-number">{{ in_progress }}</h2>
+            </div>
+        </div>
+
+        <div class="col-6 col-lg-3">
+            <div class="dashboard-card stat-card">
+                <div class="stat-icon accent-resolved">✅</div>
+                <p class="stat-label">Resolved</p>
+                <h2 class="stat-number">{{ resolved }}</h2>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Complaint Map -->
+
+    <div class="dashboard-card mb-4">
+        <h4 class="section-title mb-2">📍 Complaint Location Map</h4>
+        <p class="muted-text mb-3">
+            View reported civic issues across different locations.
+            Click a marker to see complaint details.
+        </p>
+
+        <div id="adminMap"></div>
+    </div>
+
+    <!-- Charts -->
+
+    <div class="row g-4 mb-4">
+
+        <div class="col-lg-6">
+            <div class="dashboard-card">
+                <h4 class="section-title mb-4">Complaint Status</h4>
+
+                <div class="chart-container">
+                    <canvas id="statusChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="dashboard-card">
+                <h4 class="section-title mb-4">Complaint Priority</h4>
+
+                <div class="chart-container">
+                    <canvas id="priorityChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Complaint Management -->
+
+    <div class="dashboard-card">
+
+        <div class="mb-4">
+            <h4 class="section-title mb-1">Complaint Management</h4>
+            <p class="muted-text mb-0">
+                Review complaints and update their current status.
+            </p>
+        </div>
+
+        <div class="table-responsive">
+
+            <table class="table table-hover align-middle">
+
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Title</th>
+                        <th>Category</th>
+                        <th>Location</th>
+                        <th>Priority</th>
+                        <th>Status</th>
+                        <th>Update Status</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {% for complaint in complaints %}
+
+                    <tr>
+                        <td>#{{ complaint.id }}</td>
+
+                        <td class="fw-semibold">
+                            {{ complaint.title }}
+                        </td>
+
+                        <td>{{ complaint.category }}</td>
+
+                        <td>{{ complaint.location }}</td>
+
+                        <td>
+                            {% if complaint.priority == "High" %}
+                                <span class="badge bg-danger">High</span>
+                            {% elif complaint.priority == "Medium" %}
+                                <span class="badge bg-warning text-dark">Medium</span>
+                            {% else %}
+                                <span class="badge bg-success">Low</span>
+                            {% endif %}
+                        </td>
+
+                        <td>
+                            {% if complaint.status == "Resolved" %}
+                                <span class="badge bg-success">Resolved</span>
+                            {% elif complaint.status == "In Progress" %}
+                                <span class="badge bg-info text-dark">In Progress</span>
+                            {% else %}
+                                <span class="badge bg-warning text-dark">Pending</span>
+                            {% endif %}
+                        </td>
+
+                        <td>
+                            <form action="/update_status" method="POST"
+                                  class="d-flex gap-2">
+
+                                <input type="hidden"
+                                       name="complaint_id"
+                                       value="{{ complaint.id }}">
+
+                                <select name="status"
+                                        class="form-select form-select-sm">
+
+                                    <option value="Pending"
+                                        {% if complaint.status == "Pending" %}selected{% endif %}>
+                                        Pending
+                                    </option>
+
+                                    <option value="In Progress"
+                                        {% if complaint.status == "In Progress" %}selected{% endif %}>
+                                        In Progress
+                                    </option>
+
+                                    <option value="Resolved"
+                                        {% if complaint.status == "Resolved" %}selected{% endif %}>
+                                        Resolved
+                                    </option>
+
+                                </select>
+
+                                <button type="submit"
+                                        class="btn btn-teal btn-sm">
+                                    Save
+                                </button>
+
+                            </form>
+                        </td>
+                    </tr>
+
+                    {% else %}
+
+                    <tr>
+                        <td colspan="7" class="text-center muted-text py-4">
+                            No complaints found.
+                        </td>
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+            </table>
+
+        </div>
+    </div>
+
+    <div class="text-center mt-5 muted-text">
+        <small>© CivicPulse | Building Better Communities</small>
+    </div>
+
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+    // Initialize admin map
+
+    const adminMap = L.map("adminMap").setView([20.5937, 78.9629], 5);
+
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(adminMap);
+
+    const mapBounds = [];
+
+    // Add complaint markers
+
+    {% for complaint in complaints %}
+
+        {% if complaint.latitude is not none and complaint.longitude is not none %}
+
+            const marker{{ loop.index }} = L.marker([
+                {{ complaint.latitude }},
+                {{ complaint.longitude }}
+            ]).addTo(adminMap);
+
+            const popupContent{{ loop.index }} = document.createElement("div");
+
+            const complaintTitle{{ loop.index }} = document.createElement("strong");
+            complaintTitle{{ loop.index }}.textContent = {{ complaint.title | tojson }};
+            popupContent{{ loop.index }}.appendChild(complaintTitle{{ loop.index }});
+
+            const complaintDetails{{ loop.index }} = document.createElement("p");
+            complaintDetails{{ loop.index }}.textContent =
+                "ID: {{ complaint.id }} | Location: " + {{ complaint.location | tojson }};
+            popupContent{{ loop.index }}.appendChild(complaintDetails{{ loop.index }});
+
+            const complaintPriority{{ loop.index }} = document.createElement("p");
+            complaintPriority{{ loop.index }}.textContent =
+                "Priority: " + {{ complaint.priority | tojson }} +
+                " | Status: " + {{ complaint.status | tojson }};
+            popupContent{{ loop.index }}.appendChild(complaintPriority{{ loop.index }});
+
+            marker{{ loop.index }}.bindPopup(popupContent{{ loop.index }});
+
+            mapBounds.push([
+                {{ complaint.latitude }},
+                {{ complaint.longitude }}
+            ]);
+
+        {% endif %}
+
+    {% endfor %}
+
+    if (mapBounds.length > 0) {
+        adminMap.fitBounds(mapBounds, { padding: [40, 40] });
+    }
+
+    setTimeout(() => {
+        adminMap.invalidateSize();
+    }, 100);
+
+    // Chart.js common settings
+
+    Chart.defaults.color = "#cbd5e1";
+    Chart.defaults.font.family = "Arial";
+
+    // Complaint Status Chart
+
+    new Chart(document.getElementById("statusChart"), {
+        type: "pie",
+
+        data: {
+            labels: ["Pending", "In Progress", "Resolved"],
+
+            datasets: [{
+                data: [
+                    {{ pending }},
+                    {{ in_progress }},
+                    {{ resolved }}
+                ],
+
+                backgroundColor: [
+                    "#fbbf24",
+                    "#60a5fa",
+                    "#4ade80"
+                ],
+
+                borderColor: "#142137",
+                borderWidth: 3
+            }]
+        },
+
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+
+            plugins: {
+                legend: {
+                    position: "bottom",
+                    labels: {
+                        padding: 20,
+                        usePointStyle: true
+                    }
+                }
+            }
+        }
+    });
+
+    // Complaint Priority Chart
+
+    new Chart(document.getElementById("priorityChart"), {
+        type: "doughnut",
+
+        data: {
+            labels: ["High", "Medium", "Low"],
+
+            datasets: [{
+                data: [
+                    {{ high }},
+                    {{ medium }},
+                    {{ low }}
+                ],
+
+                backgroundColor: [
+                    "#f87171",
+                    "#fbbf24",
+                    "#4ade80"
+                ],
+
+                borderColor: "#142137",
+                borderWidth: 3
+            }]
+        },
+
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+
+            plugins: {
+                legend: {
+                    position: "bottom",
+                    labels: {
+                        padding: 20,
+                        usePointStyle: true
+                    }
+                }
+            }
+        }
+    });
+</script>
+
+</body>
+</html>
